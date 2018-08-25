@@ -31,7 +31,7 @@ main = do
     lines1 = lines file1
     lines2 = lines file2
 
-  putStrLn $ show $ prettyContextDiff (text fn1) (text fn2) text [smlr 15 3 lines1 lines2]
+  print $ prettyContextDiff (text fn1) (text fn2) text [smlr 15 3 lines1 lines2]
 --  putStrLn $ smlr' 10 9 lines1 lines2
 --  putStrLn $ show $ longestSimilar 30 8 lines1 lines2
   
@@ -50,19 +50,20 @@ sndT :: Distance a -> [a]
 sndT (Distance _ _ ls) = ls
 sndT Void = []
 
-longestSimilar :: (Eq a, Ord a, Show a, ToText a) => Int -> Int -> [a] -> [a] -> Distance a
+longestSimilar :: (ToText a) => Int -> Int -> [a] -> [a] -> Distance a
 longestSimilar i d as bs = maximumBy (comparing distnum) $ similarsBy i d as bs
 
-similarsBy :: (Eq a, Ord a, Show a, ToText a) => Int -> Int -> [a] -> [a] -> [Distance a]
-similarsBy i d as bs = map (distances $ take i $ inits bs) $ take i $ inits as
+similarsBy :: (ToText a) => Int -> Int -> [a] -> [a] -> [Distance a]
+similarsBy i d as bs =
+  map (distances $ take i $ inits bs) $ take i $ inits as
 
   where
-    distances :: (Eq a, Ord a, Show a, ToText a) => [[a]] -> [a] -> Distance a
+    distances :: (ToText a) => [[a]] -> [a] -> Distance a
     distances bss as' = case mostSimilar bss as' of
                          Just a -> tameTails a
                          Nothing -> Void
     
-    mostSimilar :: (Eq a, Show a, ToText a) => [[a]] -> [a] -> Maybe (Distance a)
+    mostSimilar :: (ToText a) => [[a]] -> [a] -> Maybe (Distance a)
     mostSimilar [] _ = Nothing
     mostSimilar edges a =
       Just $
@@ -70,38 +71,37 @@ similarsBy i d as bs = map (distances $ take i $ inits bs) $ take i $ inits as
       filter ((> d) . length . sndT) $
       map (measure a) edges
     
-    tameTails m = let as = fstT m
-                      bs = sndT m
-                      cs = if (length as) < (length bs)
+    tameTails m = let ass = fstT m
+                      bss = sndT m
+                      css = if (length ass) < (length bss)
                            then
-                             map (measure as) (inits bs)
+                             map (measure ass) (inits bss)
                            else
-                             map (flip measure bs) (inits as)
-                  in case maximumBy (comparing distnum) cs of
+                             map (flip measure bss) (inits ass)
+                  in case maximumBy (comparing distnum) css of
                        Distance _ [] _ -> m
                        Distance _ _ [] -> m
                        x -> x
     
     measure ls ls' = Distance (damerauLevenshteinNormInd ls ls') ls ls'
 
-smlr :: (Eq a, Ord a, Show a, ToText a) => Int -> Int -> [a] -> [a] -> [Diff [a]]
-smlr l d [] [] = []
-smlr l d as [] = [First as]
-smlr l d [] bs = [Second bs]
+smlr :: (Ord a, Show a, ToText a) => Int -> Int -> [a] -> [a] -> [Diff [a]]
+smlr _ _ [] [] = []
+smlr _ _ as [] = [First as]
+smlr _ _ [] bs = [Second bs]
 smlr l d as bs = case longestSimilar l d as bs of
-  Distance i [] _ -> diff as bs
-  Distance i _ [] -> diff as bs
+  Void -> []
+  Distance _ [] _ -> diff as bs
+  Distance _ _ [] -> diff as bs
   Distance i similarA similarB
     -> let (beforeA, afterA) = splitBySimilar similarA as
-           (beforeB, afterB) = splitBySimilar similarB bs
-           
+           (beforeB, afterB) = splitBySimilar similarB bs           
        in smlr l d beforeA beforeB ++
           diffByNeed i similarA similarB ++
           smlr l d afterA afterB
-
-    where diffByNeed i as bs = if i > 0.95
-                               then diff as bs
-                               else [First as, Second bs]
+    where diffByNeed _ ass bss = if i > 0.95
+                                 then diff ass bss
+                                 else [First ass, Second bss]
 
 splitBySimilar similar ls
   = let index = match (build similar) ls
@@ -116,36 +116,37 @@ splitBySimilar similar ls
 
 {- measure distance -}
 
-jaroWinklerInd :: (Eq a, Show a, ToText a) => [a] -> [a] -> Ratio Int
-jaroWinklerInd a b = let as = Text.intercalate " " $ filter ((/="") . unpack) $map toText a
-                         bs = Text.intercalate " " $ filter ((/="") . unpack) $map toText b
+jaroWinklerInd :: (ToText a) => [a] -> [a] -> Ratio Int
+jaroWinklerInd a b = let as = Text.intercalate " " $ filter ((/="") . unpack) $ map toText a
+                         bs = Text.intercalate " " $ filter ((/="") . unpack) $ map toText b
                      in jaroWinkler as bs
 
-damerauLevenshteinNormInd :: (Eq a, Show a, ToText a) => [a] -> [a] -> Ratio Int
-damerauLevenshteinNormInd a b = let as = Text.intercalate " " $ filter ((/="") . unpack) $map toText a
-                                    bs = Text.intercalate " " $ filter ((/="") . unpack) $map toText b
+damerauLevenshteinNormInd :: (ToText a) => [a] -> [a] -> Ratio Int
+damerauLevenshteinNormInd a b = let as = Text.intercalate " " $ filter ((/="") . unpack) $ map toText a
+                                    bs = Text.intercalate " " $ filter ((/="") . unpack) $ map toText b
                                 in damerauLevenshteinNorm as bs
 
 {- for debug -}
 
-smlr' :: (Eq a, Ord a, Show a, ToText a) => Int -> Int -> [a] -> [a] -> String
-smlr' l d [] [] = ""
-smlr' l d as [] = ""
-smlr' l d [] bs = ""
+smlr' :: (Ord a, Show a, ToText a) => Int -> Int -> [a] -> [a] -> String
+smlr' _ _ [] [] = ""
+smlr' _ _ _ [] = ""
+smlr' _ _ [] _ = ""
 smlr' l d as bs = case longestSimilar l d as bs of
+  Void -> ""
   Distance _ [] _ -> ""
   Distance _ _ [] -> ""
   Distance i similarA similarB
     -> let (beforeA, afterA) = splitBySimilar similarA as
            (beforeB, afterB) = splitBySimilar similarB bs
-       in  (show i) ++
-               "A:" ++ (show $ take 100 similarA) ++ "\n====\n" ++
-               "B:" ++ (show $ take 100 similarB)
+       in  show i ++
+               "A:" ++ show (take 100 similarA) ++ "\n====\n" ++
+               "B:" ++ show (take 100 similarB)
 
-similarities as bs = map (compare $ construct bs) $ tails as
+similarities as bs = map (cmpr $ construct bs) $ tails as
   where
-    compare :: (Eq a, Show a, ToText a) => STree a -> [a] -> [(Ratio Int, ([a],[a]))]
-    compare (Node edges) a = filter ((>0.8) . fst) $
-      map (\(b,tree) -> (jaroWinklerInd a $ prefix b, ((take 10 a),(take 10 $ prefix b)))) edges
-    compare Leaf _ = []
+    cmpr :: (ToText a) => STree a -> [a] -> [(Ratio Int, ([a],[a]))]
+    cmpr (Node edges) a = filter ((>0.8) . fst) $
+      map (\(b,tree) -> (jaroWinklerInd a $ prefix b, (take 10 a, take 10 $ prefix b))) edges
+    cmpr Leaf _ = []
 
