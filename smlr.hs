@@ -31,7 +31,7 @@ main = do
     lines1 = lines file1
     lines2 = lines file2
 
-  print $ prettyContextDiff (text fn1) (text fn2) text [smlr 15 3 lines1 lines2]
+  print $ prettyContextDiff (text fn1) (text fn2) text [smlr 15 1 lines1 lines2]
 --  putStrLn $ smlr' 10 9 lines1 lines2
 --  putStrLn $ show $ longestSimilar 30 8 lines1 lines2
   
@@ -99,7 +99,7 @@ smlr l d as bs = case longestSimilar l d as bs of
        in smlr l d beforeA beforeB ++
           diffByNeed i similarA similarB ++
           smlr l d afterA afterB
-    where diffByNeed _ ass bss = if i > 0.95
+    where diffByNeed _ ass bss = if i > 0.75
                                  then diff ass bss
                                  else [First ass, Second bss]
 
