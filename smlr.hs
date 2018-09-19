@@ -12,7 +12,7 @@ import Text.PrettyPrint.HughesPJ (text)
 import Data.Algorithms.KMP (build, match)
 import Data.SuffixTree (STree(..), construct, prefix)
 import Data.Ratio ((%), Ratio(..))
-import Data.List (inits, tails, maximumBy)
+import Data.List (inits, tails, maximumBy, minimumBy)
 import Data.Ord (comparing)
 
 import Data.Text as Text (pack, unpack, intercalate)
@@ -31,7 +31,7 @@ main = do
     lines1 = lines file1
     lines2 = lines file2
 
-  print $ prettyContextDiff (text fn1) (text fn2) text [smlr 15 1 lines1 lines2]
+  print $ prettyContextDiff (text fn1) (text fn2) text [smlr 20 2 lines1 lines2]
 --  putStrLn $ smlr' 10 9 lines1 lines2
 --  putStrLn $ show $ longestSimilar 30 8 lines1 lines2
   
@@ -74,11 +74,11 @@ similarsBy i d as bs =
     tameTails m = let ass = fstT m
                       bss = sndT m
                       css = if (length ass) < (length bss)
-                           then
-                             map (measure ass) (inits bss)
-                           else
-                             map (flip measure bss) (inits ass)
-                  in case maximumBy (comparing distnum) css of
+                            then
+                              map (measure ass) (inits bss)
+                            else
+                              map (flip measure bss) (inits ass)
+                  in case minimumBy (comparing distnum) css of
                        Distance _ [] _ -> m
                        Distance _ _ [] -> m
                        x -> x
@@ -90,12 +90,12 @@ smlr _ _ [] [] = []
 smlr _ _ as [] = [First as]
 smlr _ _ [] bs = [Second bs]
 smlr l d as bs = case longestSimilar l d as bs of
-  Void -> []
+  Void -> [First as, Second bs]
   Distance _ [] _ -> diff as bs
   Distance _ _ [] -> diff as bs
   Distance i similarA similarB
     -> let (beforeA, afterA) = splitBySimilar similarA as
-           (beforeB, afterB) = splitBySimilar similarB bs           
+           (beforeB, afterB) = splitBySimilar similarB bs
        in smlr l d beforeA beforeB ++
           diffByNeed i similarA similarB ++
           smlr l d afterA afterB
